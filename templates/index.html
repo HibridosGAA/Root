@@ -151,9 +151,33 @@
         }
 
         // --- ARMA Y JUGADORES ---
-        const armaTex = loader.load('/static/texturas/arma.png'); 
-        const arma = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.7), new THREE.MeshBasicMaterial({ map: armaTex, transparent: true, depthTest: false }));
-        arma.position.set(0.45, -0.35, -0.6); camera.add(arma); scene.add(camera);
+
+        const armas = [
+            { nombre: "PISTOLA", tex: loader.load('/static/texturas/arma.png'), escala: [0.7, 0.4] },
+            { nombre: "RIFLE", tex: loader.load('/static/texturas/arma01.png'), escala: [1.2, 0.8] }
+        ];
+        let weaponIdx = 0;
+
+        const armaMat = new THREE.MeshBasicMaterial({ map: armas[0].tex, transparent: true, depthTest: false });
+        const armaMesh = new THREE.Mesh(new THREE.PlaneGeometry(armas[0].escala[0], armas[0].escala[1]), armaMat);
+        armaMesh.position.set(0.4, -0.3, -0.6);
+        camera.add(armaMesh);
+        scene.add(camera);
+
+        function cambiarArma(delta) {
+            // Cambiar índice basado en dirección de la rueda
+            weaponIdx = (weaponIdx + (delta > 0 ? 1 : -1) + armas.length) % armas.length;
+            
+            // Actualizar textura y escala
+            armaMat.map = armas[weaponIdx].tex;
+            armaMesh.geometry = new THREE.PlaneGeometry(armas[weaponIdx].escala[0], armas[weaponIdx].escala[1]);
+            
+            // UI
+            document.getElementById('weapon-name').innerText = armas[weaponIdx].nombre;
+            
+            // Sonido de "clic" o cambio si tienes uno (usaremos recarga momentáneamente)
+            if(reloadSnd.buffer) reloadSnd.play();
+        }
 
         const jugadorTex = loader.load('/static/texturas/jugador.png');
         const jugadorMat = new THREE.MeshBasicMaterial({ map: jugadorTex, transparent: true, side: THREE.DoubleSide });
