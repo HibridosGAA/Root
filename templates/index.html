@@ -3,55 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>FPS MULTIPLAYER ONLINE</title>
+    <title>FPS MULTIPLAYER FIX</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; user-select: none; touch-action: none; }
-        .overlay-menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; text-align: center; }
-        input { padding: 15px; font-size: 18px; border-radius: 8px; border: 2px solid #0f0; background: #222; color: #fff; margin-bottom: 20px; outline: none; text-align: center; }
-        button { padding: 15px 40px; font-size: 20px; cursor: pointer; background: #0f0; border: none; border-radius: 8px; font-weight: bold; transition: 0.3s; margin: 10px; }
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; user-select: none; touch-action: none; }
+        .overlay-menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; }
+        input { padding: 15px; font-size: 18px; border-radius: 8px; border: 2px solid #0f0; background: #222; color: #fff; margin-bottom: 20px; text-align: center; }
+        button { padding: 15px 40px; font-size: 20px; cursor: pointer; background: #0f0; border: none; border-radius: 8px; font-weight: bold; }
         #mobile-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 150; pointer-events: none; }
-        .joy-btn { width: 65px; height: 65px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); border-radius: 12px; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: auto; }
-        .d-pad { position: absolute; bottom: 40px; left: 30px; display: grid; grid-template-columns: repeat(3, 70px); gap: 8px; }
-        .actions-right { position: absolute; bottom: 40px; right: 30px; display: flex; flex-direction: column; gap: 15px; }
-        #ui { position: absolute; top: 20px; left: 20px; color: #0f0; font-size: 22px; z-index: 10; text-shadow: 2px 2px #000; font-family: monospace; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; border: 2px solid #0f0; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 5; }
-        #minimap-border { position: absolute; top: 15px; right: 15px; width: 160px; height: 160px; border: 3px solid #0f0; border-radius: 10px; z-index: 100; pointer-events: none; background: rgba(0, 255, 0, 0.05); }
+        .joy-btn { width: 60px; height: 60px; background: rgba(255,255,255,0.2); border: 2px solid #fff; border-radius: 10px; color: white; display: flex; align-items: center; justify-content: center; pointer-events: auto; touch-action: none; }
+        .d-pad { position: absolute; bottom: 40px; left: 20px; display: grid; grid-template-columns: repeat(3, 65px); gap: 5px; }
+        .actions-right { position: absolute; bottom: 40px; right: 20px; display: flex; flex-direction: column; gap: 10px; }
+        #ui { position: absolute; top: 10px; left: 10px; color: #0f0; font-size: 18px; z-index: 10; font-family: monospace; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; border: 2px solid #0f0; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; }
     </style>
 </head>
 <body>
 
     <div id="step-name" class="overlay-menu">
-        <h1>FPS ONLINE - INGRESO</h1>
-        <input type="text" id="username" placeholder="NOMBRE DEL SOLDADO..." autocomplete="off">
-        <button onclick="nextStep()">REGISTRAR E INGRESAR</button>
+        <h1>ROOT - MULTIPLAYER</h1>
+        <input type="text" id="username" placeholder="TU NOMBRE...">
+        <button onclick="nextStep()">CONECTAR</button>
     </div>
 
     <div id="step-device" class="overlay-menu" style="display: none;">
-        <h1>BIENVENIDO <span id="user-welcome"></span></h1>
-        <p>SELECCIONA TU PLATAFORMA:</p>
-        <button onclick="startGame('pc')">COMPUTADORA</button>
-        <button onclick="startGame('movil')">CELULAR (TÁCTIL)</button>
+        <button onclick="startGame('pc')">PC (Mouse/Teclado)</button>
+        <button onclick="startGame('movil')">MÓVIL (Táctil)</button>
     </div>
 
-    <div id="ui">SOLDADO: <span id="disp-name">---</span> | BALAS: <span id="ammo">10</span> | BAJAS: <span id="kills">0</span></div>
+    <div id="ui">SOLDADO: <span id="disp-name">---</span> | AMMO: <span id="ammo">10</span></div>
     <div id="crosshair"></div>
-    <div id="minimap-border"></div>
 
     <div id="mobile-controls">
         <div class="d-pad">
-            <div style="grid-column: 2" class="joy-btn" data-key="KeyW">W</div>
-            <div style="grid-column: 1" class="joy-btn" data-key="KeyA">A</div>
-            <div style="grid-column: 2" class="joy-btn" data-key="KeyS">S</div>
-            <div style="grid-column: 3" class="joy-btn" data-key="KeyD">D</div>
+            <div style="grid-column: 2" class="joy-btn" id="btn-W">W</div>
+            <div style="grid-column: 1" class="joy-btn" id="btn-A">A</div>
+            <div style="grid-column: 2" class="joy-btn" id="btn-S">S</div>
+            <div style="grid-column: 3" class="joy-btn" id="btn-D">D</div>
         </div>
         <div class="actions-right">
-            <div class="joy-btn" style="background: rgba(255,0,0,0.5); width: 80px; height: 80px;" id="m-shoot">FUEGO</div>
-            <div style="display: flex; gap: 10px;">
-                <div class="joy-btn" data-key="ControlLeft">CTRL</div>
-                <div class="joy-btn" id="m-reload">R</div>
-                <div class="joy-btn" data-key="Space">↑</div>
-            </div>
+            <div class="joy-btn" style="background: red; width: 80px;" id="btn-FIRE">FUEGO</div>
+            <div class="joy-btn" id="btn-RELOAD">R</div>
+            <div class="joy-btn" id="btn-JUMP">↑</div>
         </div>
     </div>
 
@@ -62,192 +55,163 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- VARIABLES GLOBALES ---
-        const socket = io(); // Inicializar Socket.io
-        let deviceMode = 'pc';
-        let ammo = 10;
-        let kills = 0;
-        let isReloading = false;
-        const keys = {};
-        const otrosJugadores = {}; // Diccionario para mallas de otros jugadores
-        const enemigos = []; // Bots locales
-        let miNombre = "";
+        const socket = io();
+        let deviceMode = 'pc', ammo = 10, isReloading = false, miNombre = "";
+        const keys = {}, otrosJugadores = {}, muros = [];
 
-        // --- INTERFAZ Y REGISTRO ---
-        window.nextStep = () => {
-            const name = document.getElementById('username').value.trim();
-            if(name.length < 2) return alert("Nombre demasiado corto");
-            miNombre = name;
-
-            fetch('/guardar_usuario', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({"username": name})
-            })
-            .then(res => res.json())
-            .then(data => {
-                if(data.status === "error") {
-                    alert(data.message);
-                } else {
-                    document.getElementById('user-welcome').innerText = name.toUpperCase();
-                    document.getElementById('disp-name').innerText = name.toUpperCase();
-                    document.getElementById('step-name').style.display = 'none';
-                    document.getElementById('step-device').style.display = 'flex';
-                }
-            })
-            .catch(() => alert("Error de conexión con el servidor"));
-        };
-
-        window.startGame = (type) => {
-            deviceMode = type;
-            // Posición aleatoria al iniciar
-            const spawnRange = 40;
-            camera.position.set((Math.random()-0.5)*spawnRange*2, 1.7, (Math.random()-0.5)*spawnRange*2);
-            
-            document.getElementById('step-device').style.display = 'none';
-            if(type === 'movil') document.getElementById('mobile-controls').style.display = 'block';
-            else renderer.domElement.requestPointerLock();
-            
-            // Unirse a la sala multijugador
-            socket.emit('join', { name: miNombre });
-            
-            if (listener.context.state === 'suspended') listener.context.resume();
-            animate();
-        };
-
-        // --- CONFIGURACIÓN DE ESCENA ---
+        // --- ESCENA ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb);
+        scene.background = new THREE.Color(0x222222);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         camera.rotation.order = 'YXZ';
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.autoClear = false;
         document.body.appendChild(renderer.domElement);
 
-        // Minimapa
-        const mapCam = new THREE.OrthographicCamera(-60, 60, 60, -60, 1, 1000);
-        mapCam.position.set(0, 100, 0);
-        mapCam.lookAt(0,0,0);
-
-        // Iluminación y Suelo
-        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
         const loader = new THREE.TextureLoader();
-        const sueloTex = loader.load('/static/texturas/suelo.jpeg');
-        sueloTex.wrapS = sueloTex.wrapT = THREE.RepeatWrapping;
-        sueloTex.repeat.set(50, 50);
-        const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshPhongMaterial({ map: sueloTex }));
-        ground.rotation.x = -Math.PI / 2;
+        const listener = new THREE.AudioListener();
+        camera.add(listener);
+
+        // --- CARGA DE ASSETS ---
+        const texMuro = loader.load('/static/texturas/muro.jpeg');
+        const texSuelo = loader.load('/static/texturas/suelo.jpeg');
+        const texJugador = loader.load('/static/texturas/jugador.png');
+        const texArma = loader.load('/static/texturas/arma.png');
+
+        const sndShoot = new THREE.Audio(listener);
+        const sndReload = new THREE.Audio(listener);
+        const sndSteps = new THREE.Audio(listener);
+
+        const audioLoader = new THREE.AudioLoader();
+        audioLoader.load('/static/audio/disparo.mp3', b => sndShoot.setBuffer(b));
+        audioLoader.load('/static/audio/recarga.mp3', b => sndReload.setBuffer(b));
+        audioLoader.load('/static/audio/pasos.mp3', b => { sndSteps.setBuffer(b); sndSteps.setLoop(true); sndSteps.setVolume(0.3); });
+
+        // --- CONSTRUCCIÓN ---
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshPhongMaterial({ map: texSuelo }));
+        ground.rotation.x = -Math.PI/2;
         scene.add(ground);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
 
-        // Muros (Límites)
-        const muros = [];
-        function crearMuro(x, z, w, h, d) {
-            const muro = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshPhongMaterial({ color: 0x444444 }));
-            muro.position.set(x, h/2, z);
-            scene.add(muro);
-            muros.push(muro);
+        function crearMuro(x, z, w, d) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(w, 5, d), new THREE.MeshPhongMaterial({ map: texMuro }));
+            m.position.set(x, 2.5, z);
+            scene.add(m);
+            muros.push(new THREE.Box3().setFromObject(m));
         }
-        crearMuro(0, -50, 100, 5, 1); crearMuro(0, 50, 100, 5, 1);
-        crearMuro(-50, 0, 1, 5, 100); crearMuro(50, 0, 1, 5, 100);
+        crearMuro(0, -50, 100, 1); crearMuro(0, 50, 100, 1);
+        crearMuro(-50, 0, 1, 100); crearMuro(50, 0, 1, 100);
 
-        // Arma (Visual)
-        const armaTex = loader.load('/static/texturas/arma.png');
-        const arma = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.6), new THREE.MeshBasicMaterial({ map: armaTex, transparent: true, depthTest: false }));
-        arma.position.set(0.4, -0.3, -0.6);
+        const arma = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.5), new THREE.MeshBasicMaterial({ map: texArma, transparent: true, depthTest: false }));
+        arma.position.set(0.3, -0.25, -0.5);
         camera.add(arma);
         scene.add(camera);
 
-        // --- LÓGICA MULTIJUGADOR (RECIBIR DATOS) ---
-        const jugadorMat = new THREE.MeshBasicMaterial({ map: loader.load('/static/texturas/jugador.png'), transparent: true, side: THREE.DoubleSide });
+        // --- LÓGICA JUEGO ---
+        window.nextStep = () => {
+            miNombre = document.getElementById('username').value;
+            if(miNombre.length < 2) return;
+            document.getElementById('step-name').style.display = 'none';
+            document.getElementById('step-device').style.display = 'flex';
+        };
 
-        socket.on('new_player', (data) => {
-            console.log("Nuevo jugador:", data.name);
-            const body = new THREE.Mesh(new THREE.PlaneGeometry(2, 4), jugadorMat);
-            body.position.set(0, 2, 0);
-            scene.add(body);
-            otrosJugadores[data.id] = body;
-        });
+        window.startGame = (type) => {
+            deviceMode = type;
+            const range = 30;
+            camera.position.set((Math.random()-0.5)*range, 1.7, (Math.random()-0.5)*range);
+            document.getElementById('step-device').style.display = 'none';
+            if(type === 'movil') document.getElementById('mobile-controls').style.display = 'block';
+            else renderer.domElement.requestPointerLock();
+            
+            socket.emit('join', { name: miNombre });
+            if (listener.context.state === 'suspended') listener.context.resume();
+            animate();
+        };
 
-        socket.on('player_moved', (data) => {
-            if(otrosJugadores[data.id]) {
-                otrosJugadores[data.id].position.set(data.x, 2, data.z);
-                otrosJugadores[data.id].rotation.y = data.ry;
-            }
-        });
-
-        socket.on('player_left', (data) => {
-            if(otrosJugadores[data.id]) {
-                scene.remove(otrosJugadores[data.id]);
-                delete otrosJugadores[data.id];
-            }
-        });
-
-        // --- ACCIONES Y SONIDOS ---
-        const listener = new THREE.AudioListener(); camera.add(listener);
-        const shootSnd = new THREE.Audio(listener);
-        new THREE.AudioLoader().load('/static/audio/disparo.mp3', b => shootSnd.setBuffer(b));
+        // --- CONTROLES MÓVIL ---
+        const bindBtn = (id, key) => {
+            const el = document.getElementById(id);
+            el.addEventListener('pointerdown', (e) => { e.preventDefault(); keys[key] = true; });
+            el.addEventListener('pointerup', (e) => { e.preventDefault(); keys[key] = false; });
+        };
+        bindBtn('btn-W', 'KeyW'); bindBtn('btn-A', 'KeyA'); bindBtn('btn-S', 'KeyS'); bindBtn('btn-D', 'KeyD');
+        document.getElementById('btn-FIRE').addEventListener('pointerdown', fire);
+        document.getElementById('btn-RELOAD').addEventListener('pointerdown', reload);
 
         function fire() {
             if(isReloading || ammo <= 0) return;
-            if(shootSnd.buffer) { shootSnd.stop(); shootSnd.play(); }
-            arma.position.z += 0.05; setTimeout(() => arma.position.z -= 0.05, 60);
+            if(sndShoot.buffer) sndShoot.play();
             ammo--; document.getElementById('ammo').innerText = ammo;
-            // Aquí se añadiría la lógica de daño vía Socket.io
+            arma.position.z += 0.05; setTimeout(() => arma.position.z -= 0.05, 50);
         }
 
         function reload() {
             if(isReloading || ammo === 10) return;
             isReloading = true;
+            if(sndReload.buffer) sndReload.play();
             arma.position.y -= 0.3;
             setTimeout(() => { ammo = 10; document.getElementById('ammo').innerText = ammo; isReloading = false; arma.position.y += 0.3; }, 2000);
         }
 
-        // --- EVENTOS ---
-        document.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'KeyR') reload(); });
-        document.addEventListener('keyup', e => keys[e.code] = false);
-        document.addEventListener('mousedown', () => { if(document.pointerLockElement) fire(); });
-        document.getElementById('m-shoot').addEventListener('pointerdown', fire);
-        document.getElementById('m-reload').addEventListener('pointerdown', reload);
-        document.addEventListener('mousemove', e => { if(document.pointerLockElement) { camera.rotation.y -= e.movementX*0.002; camera.rotation.x -= e.movementY*0.002; } });
+        // --- COLISIONES ---
+        function checkCol(pos) {
+            const playerBox = new THREE.Box3().setFromCenterAndSize(pos, new THREE.Vector3(1, 1, 1));
+            for(let m de muros) if(playerBox.intersectsBox(m)) return true;
+            return false;
+        }
 
-        // --- BUCLE DE ANIMACIÓN ---
+        // --- MULTIJUGADOR ---
+        socket.on('new_player', (data) => {
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 4), new THREE.MeshBasicMaterial({ map: texJugador, transparent: true, side: THREE.DoubleSide }));
+            scene.add(mesh);
+            otrosJugadores[data.id] = mesh;
+        });
+
+        socket.on('player_moved', (data) => {
+            if(!otrosJugadores[data.id]) {
+                const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 4), new THREE.MeshBasicMaterial({ map: texJugador, transparent: true, side: THREE.DoubleSide }));
+                scene.add(mesh);
+                otrosJugadores[data.id] = mesh;
+            }
+            otrosJugadores[data.id].position.set(data.x, 2, data.z);
+            otrosJugadores[data.id].rotation.y = data.ry;
+        });
+
+        socket.on('player_left', id => { if(otrosJugadores[id]) { scene.remove(otrosJugadores[id]); delete otrosJugadores[id]; } });
+
+        // --- LOOP ---
         function animate() {
             requestAnimationFrame(animate);
-
             const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
             const side = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), dir).normalize();
-            let moving = false;
+            const posPrev = camera.position.clone();
+            let moved = false;
 
-            if (keys['KeyW']) { camera.position.addScaledVector(dir, 0.15); moving = true; }
-            if (keys['KeyS']) { camera.position.addScaledVector(dir, -0.15); moving = true; }
-            if (keys['KeyA']) { camera.position.addScaledVector(side, 0.15); moving = true; }
-            if (keys['KeyD']) { camera.position.addScaledVector(side, -0.15); moving = true; }
+            if(keys['KeyW']) camera.position.addScaledVector(dir, 0.15);
+            if(keys['KeyS']) camera.position.addScaledVector(dir, -0.15);
+            if(keys['KeyA']) camera.position.addScaledVector(side, 0.15);
+            if(keys['KeyD']) camera.position.addScaledVector(side, -0.15);
 
-            // Enviar posición al servidor si nos movemos
-            if(moving || Math.abs(camera.rotation.y) > 0) {
-                socket.emit('move', {
-                    x: camera.position.x,
-                    y: camera.position.y,
-                    z: camera.position.z,
-                    ry: camera.rotation.y
-                });
+            if(checkCol(camera.position)) camera.position.copy(posPrev);
+            else if(keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD']) moved = true;
+
+            if(moved) {
+                if(!sndSteps.isPlaying && sndSteps.buffer) sndSteps.play();
+                socket.emit('move', { x: camera.position.x, y: camera.position.y, z: camera.position.z, ry: camera.rotation.y });
+            } else { sndSteps.pause(); }
+
+            // Rotación celular
+            if(deviceMode === 'movil') {
+                // Implementación simple de giro táctil si deseas (opcional)
             }
 
-            // Renderizado
-            renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
-            renderer.setScissorTest(false);
             renderer.render(scene, camera);
-
-            // Minimapa
-            const mapSize = 160; const pad = 15;
-            renderer.setScissorTest(true);
-            renderer.setScissor(window.innerWidth - mapSize - pad, window.innerHeight - mapSize - pad, mapSize, mapSize);
-            renderer.setViewport(window.innerWidth - mapSize - pad, window.innerHeight - mapSize - pad, mapSize, mapSize);
-            mapCam.position.x = camera.position.x; mapCam.position.z = camera.position.z;
-            renderer.render(scene, mapCam);
         }
+
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+        window.addEventListener('mousemove', e => { if(document.pointerLockElement) { camera.rotation.y -= e.movementX*0.002; camera.rotation.x -= e.movementY*0.002; } });
     </script>
 </body>
 </html>
