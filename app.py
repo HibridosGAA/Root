@@ -7,10 +7,10 @@ import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secreto_fps_123'
-# CORS habilitado para evitar bloqueos en el despliegue
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# --- RUTAS ---
+# Diccionario para trackear salud de jugadores
+jugadores_stats = {}
 
 @app.route('/')
 def index():
@@ -26,47 +26,59 @@ def guardar_usuario():
         datos = request.get_json(silent=True)
         if not datos or 'username' not in datos:
             return jsonify({"status": "error", "message": "Datos inválidos"}), 400
-        
         nombre = datos.get('username').strip().upper()
         ruta_base = os.path.dirname(os.path.abspath(__file__))
         ruta_lista = os.path.join(ruta_base, 'templates', 'usuarios_lista.html')
-        
-        # Asegurar que el archivo exista para evitar errores de lectura
         if not os.path.exists(ruta_lista):
             with open(ruta_lista, 'w', encoding='utf-8') as f:
                 f.write("<h1>Lista de Soldados</h1>\n")
-
-        # Guardar el nombre
         with open(ruta_lista, 'a', encoding='utf-8') as f:
             f.write(f"<p>SOLDADO: {nombre}</p>\n")
-            
         return jsonify({"status": "success", "message": "REGISTRO EXITOSO"})
     except Exception as e:
-        print(f"Error en servidor: {e}")
-        return jsonify({"status": "error", "message": "Error interno del servidor"}), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-# --- LÓGICA MULTIJUGADOR ---
+# --- EVENTOS MULTIJUGADOR EXTENDIDOS ---
 
 @socketio.on('join')
 def on_join(data):
-    sid = request.sid # type: ignore
-    # Avisar a todos que entró alguien nuevo
-    emit('new_player', {'id': sid, 'name': data.get('name', 'Anon')}, broadcast=True, include_self=False)
+    sid = request.sid
+    nombre = data.get('name', f'Recluta_{sid[:4]}')
+    jugadores_stats[sid] = {'name': nombre, 'hp': 100}
+    emit('new_player', {'id': sid, 'name': nombre}, broadcast=True, include_self=False)
 
 @socketio.on('move')
 def on_move(data):
-    # Reenviar la posición a los demás jugadores
     emit('player_moved', {
-        'id': request.sid, # type: ignore
-        'x': data['x'], 
-        'y': data['y'], 
-        'z': data['z'], 
-        'ry': data['ry']
+        'id': request.sid,
+        'x': data['x'], 'y': data['y'], 'z': data['z'], 'ry': data['ry']
     }, broadcast=True, include_self=False)
+
+@socketio.on('shoot_hit')
+def on_shoot_hit(data):
+    target_id = data.get('target_id')
+    shooter_id = request.sid
+    
+    if target_id in jugadores_stats:
+        jugadores_stats[target_id]['hp'] -= 25 # Daño por disparo
+        
+        if jugadores_stats[target_id]['hp'] <= 0:
+            jugadores_stats[target_id]['hp'] = 100 # Reset para respawn
+            # Notificar muerte a todos para el Kill Feed
+            emit('kill_event', {
+                'killer': jugadores_stats[shooter_id]['name'],
+                'victim': jugadores_stats[target_id]['name'],
+                'victim_id': target_id
+            }, broadcast=True)
+        else:
+            # Notificar solo al jugador golpeado que perdió vida
+            emit('take_damage', {'new_hp': jugadores_stats[target_id]['hp']}, room=target_id)
 
 @socketio.on('disconnect')
 def on_disconnect():
-    emit('player_left', {'id': request.sid}, broadcast=True) # type: ignore
+    if request.sid in jugadores_stats:
+        del jugadores_stats[request.sid]
+    emit('player_left', {'id': request.sid}, broadcast=True)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))

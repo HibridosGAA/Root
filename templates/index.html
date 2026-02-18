@@ -3,38 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Shooter Open World - Final</title>
+    <title>FPS MULTIPLAYER - PRO</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', sans-serif; user-select: none; touch-action: none; }
         .overlay-menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; text-align: center; }
         input { padding: 15px; font-size: 18px; border-radius: 8px; border: 2px solid #0f0; background: #222; color: #fff; margin-bottom: 20px; outline: none; text-align: center; }
         button { padding: 15px 40px; font-size: 20px; cursor: pointer; background: #0f0; border: none; border-radius: 8px; font-weight: bold; transition: 0.3s; margin: 10px; }
+        
+        /* UI GAME */
+        #ui { position: absolute; top: 20px; left: 20px; color: #0f0; font-size: 20px; z-index: 10; text-shadow: 2px 2px #000; font-family: monospace; }
+        #health-container { width: 200px; height: 20px; background: #440000; border: 2px solid #fff; margin-top: 10px; }
+        #health-bar { width: 100%; height: 100%; background: #ff0000; transition: 0.3s; }
+        
+        /* Kill Feed */
+        #kill-feed { position: absolute; top: 20px; right: 200px; width: 250px; color: #fff; text-align: right; z-index: 100; font-family: monospace; pointer-events: none; }
+        .kill-msg { background: rgba(0,0,0,0.5); padding: 5px; margin-bottom: 5px; border-right: 4px solid #f00; animation: fadeOut 5s forwards; }
+        @keyframes fadeOut { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+        /* Mobile Controls */
         #mobile-controls { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 150; pointer-events: none; }
         .joy-btn { width: 65px; height: 65px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); border-radius: 12px; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: auto; }
         .d-pad { position: absolute; bottom: 40px; left: 30px; display: grid; grid-template-columns: repeat(3, 70px); gap: 8px; }
         .actions-right { position: absolute; bottom: 40px; right: 30px; display: flex; flex-direction: column; gap: 15px; }
-        #ui { position: absolute; top: 20px; left: 20px; color: #0f0; font-size: 22px; z-index: 10; text-shadow: 2px 2px #000; font-family: monospace; }
+        
         #crosshair { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; border: 2px solid #0f0; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 5; }
         #minimap-border { position: absolute; top: 15px; right: 15px; width: 160px; height: 160px; border: 3px solid #0f0; border-radius: 10px; z-index: 100; pointer-events: none; background: rgba(0, 255, 0, 0.05); }
     </style>
 </head>
 <body>
 
+    <div id="kill-feed"></div>
+
     <div id="step-name" class="overlay-menu">
-        <h1>INICIO DE SESIÓN</h1>
-        <input type="text" id="username" placeholder="Tu nombre..." autocomplete="off">
+        <h1>OPERACIÓN MULTIJUGADOR</h1>
+        <input type="text" id="username" placeholder="NOMBRE DEL SOLDADO..." autocomplete="off">
         <button onclick="nextStep()">INGRESAR</button>
     </div>
 
     <div id="step-device" class="overlay-menu" style="display: none;">
         <h1>BIENVENIDO <span id="user-welcome"></span></h1>
-        <p>SELECCIONA PLATAFORMA:</p>
-        <button onclick="startGame('pc')">COMPUTADORA</button>
-        <button onclick="startGame('movil')">CELULAR</button>
+        <button onclick="startGame('pc')">PC (TECLADO)</button>
+        <button onclick="startGame('movil')">MÓVIL (TOUCH)</button>
     </div>
 
-    <div id="ui">SOLDADO: <span id="disp-name">---</span> | BALAS: <span id="ammo">10</span> | BAJAS: <span id="kills">0</span></div>
+    <div id="ui">
+        SOLDADO: <span id="disp-name">---</span> | BALAS: <span id="ammo">10</span>
+        <div id="health-container"><div id="health-bar"></div></div>
+    </div>
+    
     <div id="crosshair"></div>
     <div id="minimap-border"></div>
 
@@ -62,41 +79,28 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- MULTIPLAYER SETUP ---
         const socket = io();
         const otrosJugadores = {};
-        let miNombre = "";
-
-        let deviceMode = 'pc';
-        let ammo = 10;
-        let kills = 0;
-        let isReloading = false;
+        let miNombre = "", deviceMode = 'pc', ammo = 10, hp = 100, isReloading = false;
         const keys = {};
-        const enemigos = [];
 
         // --- INTERFAZ ---
         window.nextStep = () => {
             const name = document.getElementById('username').value.trim();
             if(name.length < 2) return;
-            
             fetch('/guardar_usuario', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({"username": name})
             })
-            .then(async res => {
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message || "Error");
-                return data;
-            })
+            .then(res => res.json())
             .then(data => {
                 miNombre = name;
                 document.getElementById('user-welcome').innerText = name.toUpperCase();
                 document.getElementById('disp-name').innerText = name.toUpperCase();
                 document.getElementById('step-name').style.display = 'none';
                 document.getElementById('step-device').style.display = 'flex';
-            })
-            .catch(error => { alert(error.message); });
+            });
         };
 
         window.startGame = (type) => {
@@ -104,7 +108,6 @@
             document.getElementById('step-device').style.display = 'none';
             if(type === 'movil') document.getElementById('mobile-controls').style.display = 'block';
             else renderer.domElement.requestPointerLock();
-            
             socket.emit('join', { name: miNombre });
             if (listener.context.state === 'suspended') listener.context.resume();
             animate();
@@ -113,16 +116,8 @@
         // --- ESCENA ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87ceeb);
-        
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         camera.rotation.order = 'YXZ';
-
-        const mapSize = 160;
-        const mapCam = new THREE.OrthographicCamera(-60, 60, 60, -60, 1, 1000);
-        mapCam.position.set(0, 100, 0);
-        mapCam.lookAt(0,0,0);
-        mapCam.layers.enable(0);
-        mapCam.layers.enable(1);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -131,100 +126,85 @@
 
         const loader = new THREE.TextureLoader();
         const sueloTex = loader.load('/static/texturas/suelo.jpeg');
-        sueloTex.wrapS = sueloTex.wrapT = THREE.RepeatWrapping;
-        sueloTex.repeat.set(50, 50);
-
+        sueloTex.wrapS = sueloTex.wrapT = THREE.RepeatWrapping; sueloTex.repeat.set(50, 50);
+        
         scene.add(new THREE.AmbientLight(0xffffff, 0.6));
         const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshPhongMaterial({ map: sueloTex }));
-        ground.rotation.x = -Math.PI / 2;
-        scene.add(ground);
+        ground.rotation.x = -Math.PI / 2; scene.add(ground);
 
         // --- MUROS ---
         const muros = [];
         const muroTex = loader.load('/static/texturas/muro.jpeg');
-        muroTex.wrapS = muroTex.wrapT = THREE.RepeatWrapping;
-        muroTex.repeat.set(20, 3);
-        function crearMuro(x, z, ancho, alto, profundo) {
-            const geom = new THREE.BoxGeometry(ancho, alto, profundo);
-            const mat = new THREE.MeshPhongMaterial({ map: muroTex });
-            const muro = new THREE.Mesh(geom, mat);
-            muro.position.set(x, alto / 2, z);
-            scene.add(muro);
-            muros.push(muro);
+        muroTex.wrapS = muroTex.wrapT = THREE.RepeatWrapping; muroTex.repeat.set(10, 2);
+        function crearMuro(x, z, w, h, d) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshPhongMaterial({ map: muroTex }));
+            m.position.set(x, h/2, z); scene.add(m); muros.push(m);
         }
-        const t = 100;
-        crearMuro(0, -t/2, t, 5, 1); crearMuro(0, t/2, t, 5, 1);
-        crearMuro(-t/2, 0, 1, 5, t); crearMuro(t/2, 0, 1, 5, t);
+        crearMuro(0, -50, 100, 5, 1); crearMuro(0, 50, 100, 5, 1);
+        crearMuro(-50, 0, 1, 5, 100); crearMuro(50, 0, 1, 5, 100);
 
         function puedeMoverse(nuevaPos) {
-            const m = 0.5;
-            for (let muro of muros) {
-                const caja = new THREE.Box3().setFromObject(muro);
-                if (caja.containsPoint(nuevaPos.clone().add(new THREE.Vector3(m, 0, m))) ||
-                    caja.containsPoint(nuevaPos.clone().add(new THREE.Vector3(-m, 0, -m)))) return false;
+            const playerBox = new THREE.Box3().setFromCenterAndSize(nuevaPos, new THREE.Vector3(1, 2, 1));
+            for (let m of muros) {
+                if (new THREE.Box3().setFromObject(m).intersectsBox(playerBox)) return false;
             }
             return true;
         }
 
-        // --- ICONOS ---
-        const iconoJugador = new THREE.Mesh(new THREE.SphereGeometry(3, 16, 16), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
-        iconoJugador.layers.set(1);
-        scene.add(iconoJugador);
-
         // --- ARMA Y JUGADORES ---
         const armaTex = loader.load('/static/texturas/arma.png'); 
-        const arma = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.7), new THREE.MeshBasicMaterial({ map: armaTex, transparent: true, depthTest: false, color: 0x555555 }));
-        arma.position.set(0.45, -0.35, -0.6);
-        camera.add(arma);
-        scene.add(camera);
+        const arma = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.7), new THREE.MeshBasicMaterial({ map: armaTex, transparent: true, depthTest: false }));
+        arma.position.set(0.45, -0.35, -0.6); camera.add(arma); scene.add(camera);
 
         const jugadorTex = loader.load('/static/texturas/jugador.png');
         const jugadorMat = new THREE.MeshBasicMaterial({ map: jugadorTex, transparent: true, side: THREE.DoubleSide });
 
-        // --- MULTIPLAYER RECEIVER ---
+        // --- MULTIJUGADOR RECIBIR ---
         socket.on('new_player', (data) => {
             const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 4), jugadorMat.clone());
-            mesh.position.set(0, 2, 0);
-            const dot = new THREE.Mesh(new THREE.SphereGeometry(3), new THREE.MeshBasicMaterial({ color: 0x0000ff }));
-            dot.position.y = 50; dot.layers.set(1);
-            mesh.add(dot);
-            scene.add(mesh);
-            otrosJugadores[data.id] = mesh;
+            mesh.userData.id = data.id; // Guardamos el ID en la malla
+            scene.add(mesh); otrosJugadores[data.id] = mesh;
         });
 
         socket.on('player_moved', (data) => {
             if(!otrosJugadores[data.id]) {
-                 // Si no existe, lo creamos (por si entró antes que nosotros)
                  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 4), jugadorMat.clone());
-                 const dot = new THREE.Mesh(new THREE.SphereGeometry(3), new THREE.MeshBasicMaterial({ color: 0x0000ff }));
-                 dot.position.y = 50; dot.layers.set(1);
-                 mesh.add(dot); scene.add(mesh); otrosJugadores[data.id] = mesh;
+                 mesh.userData.id = data.id; scene.add(mesh); otrosJugadores[data.id] = mesh;
             }
             otrosJugadores[data.id].position.set(data.x, 2, data.z);
             otrosJugadores[data.id].rotation.y = data.ry;
         });
 
+        socket.on('take_damage', (data) => {
+            hp = data.new_hp;
+            document.getElementById('health-bar').style.width = hp + "%";
+        });
+
+        socket.on('kill_event', (data) => {
+            const feed = document.getElementById('kill-feed');
+            const msg = document.createElement('div');
+            msg.className = 'kill-msg';
+            msg.innerHTML = `<strong>${data.killer}</strong> <span style="color:red">🔫</span> ${data.victim}`;
+            feed.appendChild(msg);
+            setTimeout(() => msg.remove(), 5000);
+
+            if(data.victim_id === socket.id) {
+                alert("HAS MUERTO. Reapareciendo...");
+                camera.position.set(Math.random()*20-10, 1.7, Math.random()*20-10);
+                hp = 100;
+                document.getElementById('health-bar').style.width = "100%";
+            }
+        });
+
         socket.on('player_left', id => { if(otrosJugadores[id]) { scene.remove(otrosJugadores[id]); delete otrosJugadores[id]; }});
 
-        // --- ENEMIGOS (BOTS) ---
-        function crearEnemigo(x, z) {
-            const dummy = new THREE.Mesh(new THREE.PlaneGeometry(2, 4), jugadorMat.clone());
-            dummy.position.set(x, 1.5, z);
-            const dot = new THREE.Mesh(new THREE.SphereGeometry(2), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
-            dot.position.y = 50; dot.layers.set(1);
-            dummy.add(dot);
-            scene.add(dummy); enemigos.push(dummy);
-        }
-        crearEnemigo(0, -10);
-
         // --- SONIDOS ---
-        const listener = new THREE.AudioListener();
-        camera.add(listener);
+        const listener = new THREE.AudioListener(); camera.add(listener);
         const shootSnd = new THREE.Audio(listener), reloadSnd = new THREE.Audio(listener), stepsSnd = new THREE.Audio(listener);
         const audioLoader = new THREE.AudioLoader();
         audioLoader.load('/static/audio/disparo.mp3', b => shootSnd.setBuffer(b));
         audioLoader.load('/static/audio/recarga.mp3', b => reloadSnd.setBuffer(b));
-        audioLoader.load('/static/audio/pasos.mp3', b => { stepsSnd.setBuffer(b); stepsSnd.setLoop(true); stepsSnd.setVolume(0.3); });
+        audioLoader.load('/static/audio/pasos.mp3', b => { stepsSnd.setBuffer(b); stepsSnd.setLoop(true); stepsSnd.setVolume(0.2); });
 
         // --- ACCIONES ---
         const raycaster = new THREE.Raycaster();
@@ -232,13 +212,17 @@
             if(isReloading || ammo <= 0) return;
             if(shootSnd.buffer) { shootSnd.stop(); shootSnd.play(); }
             arma.position.z += 0.05; setTimeout(() => arma.position.z -= 0.05, 60);
+            
+            // Detectar si le dimos a alguien
             raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-            const hits = raycaster.intersectObjects(enemigos);
+            const targets = Object.values(otrosJugadores);
+            const hits = raycaster.intersectObjects(targets);
+            
             if (hits.length > 0) {
-                const obj = hits[0].object; scene.remove(obj); enemigos.splice(enemigos.indexOf(obj), 1);
-                kills++; document.getElementById('kills').innerText = kills;
-                setTimeout(() => crearEnemigo(Math.random()*40-20, Math.random()*40-20), 2000);
+                const targetId = hits[0].object.userData.id;
+                socket.emit('shoot_hit', { target_id: targetId });
             }
+            
             ammo--; document.getElementById('ammo').innerText = ammo;
         }
 
@@ -248,14 +232,33 @@
             setTimeout(() => { ammo = 10; document.getElementById('ammo').innerText = ammo; isReloading = false; arma.position.y += 0.3; }, 2000);
         }
 
-        // --- EVENTOS ---
+        // --- CONTROLES MÓVIL (TOUCH LOOK) ---
+        let lastTouchX = 0, lastTouchY = 0;
+        document.addEventListener('touchstart', e => {
+            lastTouchX = e.touches[0].pageX;
+            lastTouchY = e.touches[0].pageY;
+        }, { passive: false });
+
+        document.addEventListener('touchmove', e => {
+            if (deviceMode !== 'movil') return;
+            // Solo rotar si no estamos tocando botones (D-pad está a la izquierda)
+            if (lastTouchX > window.innerWidth / 2 || lastTouchY < window.innerHeight / 2) {
+                const deltaX = e.touches[0].pageX - lastTouchX;
+                const deltaY = e.touches[0].pageY - lastTouchY;
+                camera.rotation.y -= deltaX * 0.005;
+                camera.rotation.x -= deltaY * 0.005;
+                lastTouchX = e.touches[0].pageX;
+                lastTouchY = e.touches[0].pageY;
+            }
+        }, { passive: false });
+
+        // --- EVENTOS GENERALES ---
         document.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'KeyR') reload(); });
         document.addEventListener('keyup', e => keys[e.code] = false);
         document.addEventListener('mousedown', () => { if(document.pointerLockElement) fire(); });
-
         document.querySelectorAll('.joy-btn').forEach(btn => {
-            btn.addEventListener('pointerdown', () => { const k = btn.dataset.key; if(k) keys[k] = true; });
-            btn.addEventListener('pointerup', () => { const k = btn.dataset.key; if(k) keys[k] = false; });
+            btn.addEventListener('pointerdown', () => { if(btn.dataset.key) keys[btn.dataset.key] = true; });
+            btn.addEventListener('pointerup', () => { if(btn.dataset.key) keys[btn.dataset.key] = false; });
         });
         document.getElementById('m-shoot').addEventListener('pointerdown', fire);
         document.getElementById('m-reload').addEventListener('pointerdown', reload);
@@ -265,16 +268,14 @@
         const player = { h: 1.7, vY: 0, canJ: true };
         function animate() {
             requestAnimationFrame(animate);
-
             const isC = keys['ControlLeft'];
             player.h = THREE.MathUtils.lerp(player.h, isC ? 0.9 : 1.7, 0.1);
-
             const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
             const side = new THREE.Vector3().crossVectors(new THREE.Vector3(0,1,0), dir).normalize();
             const s = isC ? 0.07 : 0.15;
             let moving = false;
-
             const posPrev = camera.position.clone();
+
             if (keys['KeyW']) camera.position.addScaledVector(dir, s);
             if (keys['KeyS']) camera.position.addScaledVector(dir, -s);
             if (keys['KeyA']) camera.position.addScaledVector(side, s);
@@ -283,10 +284,8 @@
             if(!puedeMoverse(camera.position)) camera.position.copy(posPrev);
             else if(keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD']) moving = true;
 
-            // Emitir posición
-            if(moving || Math.abs(camera.rotation.y) > 0.01) {
-                socket.emit('move', { x: camera.position.x, y: camera.position.y, z: camera.position.z, ry: camera.rotation.y });
-            }
+            // Emitir posición a otros
+            socket.emit('move', { x: camera.position.x, y: camera.position.y, z: camera.position.z, ry: camera.rotation.y });
 
             if (moving && camera.position.y <= player.h + 0.1) {
                 if (!stepsSnd.isPlaying && stepsSnd.buffer) stepsSnd.play();
@@ -297,19 +296,10 @@
             player.vY -= 0.008; camera.position.y += player.vY;
             if (camera.position.y <= player.h) { camera.position.y = player.h; player.vY = 0; player.canJ = true; }
 
-            iconoJugador.position.set(camera.position.x, 80, camera.position.z);
-            enemigos.forEach(e => e.lookAt(camera.position.x, 1, camera.position.z));
+            // Hacer que los otros jugadores miren siempre a la cámara (billboard)
+            Object.values(otrosJugadores).forEach(p => p.lookAt(camera.position.x, 2, camera.position.z));
 
-            renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
-            renderer.setScissorTest(false);
             renderer.render(scene, camera);
-
-            const pad = 15;
-            renderer.setScissorTest(true);
-            renderer.setScissor(window.innerWidth - mapSize - pad, window.innerHeight - mapSize - pad, mapSize, mapSize);
-            renderer.setViewport(window.innerWidth - mapSize - pad, window.innerHeight - mapSize - pad, mapSize, mapSize);
-            mapCam.position.set(camera.position.x, 100, camera.position.z);
-            renderer.render(scene, mapCam);
         }
     </script>
 </body>
