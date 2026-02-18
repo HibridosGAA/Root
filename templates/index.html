@@ -13,11 +13,11 @@
         
         /* UI GAME */
         #ui { position: absolute; top: 20px; left: 20px; color: #0f0; font-size: 20px; z-index: 10; text-shadow: 2px 2px #000; font-family: monospace; }
-        #health-container { width: 200px; height: 20px; background: #440000; border: 2px solid #fff; margin-top: 10px; }
+        #health-container { width: 200px; height: 10px; background: #440000; border: 1px solid #fff; margin-top: 10px; }
         #health-bar { width: 100%; height: 100%; background: #ff0000; transition: 0.3s; }
         
         /* Kill Feed */
-        #kill-feed { position: absolute; top: 20px; right: 200px; width: 250px; color: #fff; text-align: right; z-index: 100; font-family: monospace; pointer-events: none; }
+        #kill-feed { position: absolute; top: 20px; right: 20px; width: 250px; color: #fff; text-align: right; z-index: 100; font-family: monospace; pointer-events: none; }
         .kill-msg { background: rgba(0,0,0,0.5); padding: 5px; margin-bottom: 5px; border-right: 4px solid #f00; animation: fadeOut 5s forwards; }
         @keyframes fadeOut { 0% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
 
@@ -28,7 +28,6 @@
         .actions-right { position: absolute; bottom: 40px; right: 30px; display: flex; flex-direction: column; gap: 15px; }
         
         #crosshair { position: absolute; top: 50%; left: 50%; width: 12px; height: 12px; border: 2px solid #0f0; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; z-index: 5; }
-        
     </style>
 </head>
 <body>
@@ -48,7 +47,9 @@
     </div>
 
     <div id="ui">
-        SOLDADO: <span id="disp-name">---</span> | BALAS: <span id="ammo">10</span>
+        SOLDADO: <span id="disp-name">---</span> | 
+        ARMA: <span id="weapon-name" style="color: #ff0;">PISTOLA</span> | 
+        BALAS: <span id="ammo">10</span>
         <div id="health-container"><div id="health-bar"></div></div>
     </div>
     
@@ -68,6 +69,7 @@
                 <div class="joy-btn" id="m-reload">R</div>
                 <div class="joy-btn" data-key="Space">↑</div>
             </div>
+            <div class="joy-btn" onclick="cambiarArma(1)" style="background: rgba(0,255,0,0.2);">SWAP</div>
         </div>
     </div>
 
@@ -120,7 +122,6 @@
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.autoClear = false;
         document.body.appendChild(renderer.domElement);
 
         const loader = new THREE.TextureLoader();
@@ -150,8 +151,7 @@
             return true;
         }
 
-        // --- ARMA Y JUGADORES ---
-
+        // --- ARMAS Y JUGADORES ---
         const armas = [
             { nombre: "PISTOLA", tex: loader.load('/static/texturas/arma.png'), escala: [0.7, 0.4] },
             { nombre: "RIFLE", tex: loader.load('/static/texturas/arma01.png'), escala: [1.2, 0.8] }
@@ -164,20 +164,16 @@
         camera.add(armaMesh);
         scene.add(camera);
 
-        function cambiarArma(delta) {
-            // Cambiar índice basado en dirección de la rueda
+        window.cambiarArma = (delta) => {
             weaponIdx = (weaponIdx + (delta > 0 ? 1 : -1) + armas.length) % armas.length;
-            
-            // Actualizar textura y escala
             armaMat.map = armas[weaponIdx].tex;
+            armaMat.needsUpdate = true;
+            armaMesh.geometry.dispose();
             armaMesh.geometry = new THREE.PlaneGeometry(armas[weaponIdx].escala[0], armas[weaponIdx].escala[1]);
-            
-            // UI
-            document.getElementById('weapon-name').innerText = armas[weaponIdx].nombre;
-            
-            // Sonido de "clic" o cambio si tienes uno (usaremos recarga momentáneamente)
-            if(reloadSnd.buffer) reloadSnd.play();
-        }
+            const uiWeapon = document.getElementById('weapon-name');
+            if(uiWeapon) uiWeapon.innerText = armas[weaponIdx].nombre;
+            if(reloadSnd && reloadSnd.buffer) reloadSnd.play();
+        };
 
         const jugadorTex = loader.load('/static/texturas/jugador.png');
         const jugadorMat = new THREE.MeshBasicMaterial({ map: jugadorTex, transparent: true, side: THREE.DoubleSide });
@@ -185,7 +181,7 @@
         // --- MULTIJUGADOR RECIBIR ---
         socket.on('new_player', (data) => {
             const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 4), jugadorMat.clone());
-            mesh.userData.id = data.id; // Guardamos el ID en la malla
+            mesh.userData.id = data.id;
             scene.add(mesh); otrosJugadores[data.id] = mesh;
         });
 
@@ -234,25 +230,22 @@
         function fire() {
             if(isReloading || ammo <= 0) return;
             if(shootSnd.buffer) { shootSnd.stop(); shootSnd.play(); }
-            arma.position.z += 0.05; setTimeout(() => arma.position.z -= 0.05, 60);
+            armaMesh.position.z += 0.05; setTimeout(() => armaMesh.position.z -= 0.05, 60);
             
-            // Detectar si le dimos a alguien
             raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
             const targets = Object.values(otrosJugadores);
             const hits = raycaster.intersectObjects(targets);
-            
             if (hits.length > 0) {
                 const targetId = hits[0].object.userData.id;
                 socket.emit('shoot_hit', { target_id: targetId });
             }
-            
             ammo--; document.getElementById('ammo').innerText = ammo;
         }
 
         function reload() {
             if(isReloading || ammo === 10) return;
-            isReloading = true; if(reloadSnd.buffer) reloadSnd.play(); arma.position.y -= 0.3;
-            setTimeout(() => { ammo = 10; document.getElementById('ammo').innerText = ammo; isReloading = false; arma.position.y += 0.3; }, 2000);
+            isReloading = true; if(reloadSnd.buffer) reloadSnd.play(); armaMesh.position.y -= 0.3;
+            setTimeout(() => { ammo = 10; document.getElementById('ammo').innerText = ammo; isReloading = false; armaMesh.position.y += 0.3; }, 2000);
         }
 
         // --- CONTROLES MÓVIL (TOUCH LOOK) ---
@@ -264,7 +257,7 @@
 
         document.addEventListener('touchmove', e => {
             if (deviceMode !== 'movil') return;
-            // Solo rotar si no estamos tocando botones (D-pad está a la izquierda)
+            // Rotar solo si el toque es en la mitad derecha o superior
             if (lastTouchX > window.innerWidth / 2 || lastTouchY < window.innerHeight / 2) {
                 const deltaX = e.touches[0].pageX - lastTouchX;
                 const deltaY = e.touches[0].pageY - lastTouchY;
@@ -278,6 +271,7 @@
         // --- EVENTOS GENERALES ---
         document.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'KeyR') reload(); });
         document.addEventListener('keyup', e => keys[e.code] = false);
+        window.addEventListener('wheel', (e) => cambiarArma(e.deltaY));
         document.addEventListener('mousedown', () => { if(document.pointerLockElement) fire(); });
         document.querySelectorAll('.joy-btn').forEach(btn => {
             btn.addEventListener('pointerdown', () => { if(btn.dataset.key) keys[btn.dataset.key] = true; });
@@ -307,21 +301,18 @@
             if(!puedeMoverse(camera.position)) camera.position.copy(posPrev);
             else if(keys['KeyW'] || keys['KeyS'] || keys['KeyA'] || keys['KeyD']) moving = true;
 
-            // Emitir posición a otros
             socket.emit('move', { x: camera.position.x, y: camera.position.y, z: camera.position.z, ry: camera.rotation.y });
 
             if (moving && camera.position.y <= player.h + 0.1) {
                 if (!stepsSnd.isPlaying && stepsSnd.buffer) stepsSnd.play();
-                arma.position.y = -0.35 + Math.sin(Date.now() * 0.008) * 0.01;
-            } else { if (stepsSnd.isPlaying) stepsSnd.pause(); arma.position.y = THREE.MathUtils.lerp(arma.position.y, -0.35, 0.1); }
+                armaMesh.position.y = -0.35 + Math.sin(Date.now() * 0.008) * 0.01;
+            } else { if (stepsSnd.isPlaying) stepsSnd.pause(); armaMesh.position.y = THREE.MathUtils.lerp(armaMesh.position.y, -0.35, 0.1); }
 
             if (keys['Space'] && player.canJ) { player.vY = 0.16; player.canJ = false; }
             player.vY -= 0.008; camera.position.y += player.vY;
             if (camera.position.y <= player.h) { camera.position.y = player.h; player.vY = 0; player.canJ = true; }
 
-            // Hacer que los otros jugadores miren siempre a la cámara (billboard)
             Object.values(otrosJugadores).forEach(p => p.lookAt(camera.position.x, 2, camera.position.z));
-
             renderer.render(scene, camera);
         }
     </script>
