@@ -1,13 +1,16 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
+import eventlet
+eventlet.monkey_patch()
+
+from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
 import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secreto_fps_123'
-# Permitimos conexiones desde cualquier origen para evitar errores de CORS
-socketio = SocketIO(app, cors_allowed_origins="*")
+# CORS habilitado para evitar bloqueos en el despliegue
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# --- CONFIGURACIÓN DE RUTAS ---
+# --- RUTAS ---
 
 @app.route('/')
 def index():
@@ -15,49 +18,56 @@ def index():
 
 @app.route('/usuarios')
 def ver_usuarios():
-    # Render prefiere que usemos rutas relativas simples
     return render_template('usuarios_lista.html')
 
 @app.route('/guardar_usuario', methods=['POST'])
 def guardar_usuario():
-    datos = request.get_json(silent=True)
-    if datos and 'username' in datos:
-        nombre = datos.get('username').strip().upper()
+    try:
+        datos = request.get_json(silent=True)
+        if not datos or 'username' not in datos:
+            return jsonify({"status": "error", "message": "Datos inválidos"}), 400
         
+        nombre = datos.get('username').strip().upper()
         ruta_base = os.path.dirname(os.path.abspath(__file__))
         ruta_lista = os.path.join(ruta_base, 'templates', 'usuarios_lista.html')
         
-        # Verificación (Nota: En Render esto se reinicia con cada despliegue)
-        if os.path.exists(ruta_lista):
-            with open(ruta_lista, 'r', encoding='utf-8') as f:
-                if f"SOLDADO: {nombre}" in f.read():
-                    return jsonify({"status": "error", "message": "ID YA REGISTRADO"}), 409
+        # Asegurar que el archivo exista para evitar errores de lectura
+        if not os.path.exists(ruta_lista):
+            with open(ruta_lista, 'w', encoding='utf-8') as f:
+                f.write("<h1>Lista de Soldados</h1>\n")
 
-        try:
-            with open(ruta_lista, 'a', encoding='utf-8') as f:
-                f.write(f"<p>SOLDADO: {nombre}</p>\n")
-            return jsonify({"status": "success", "message": "Registro exitoso"})
-        except Exception as e:
-            return jsonify({"status": "error", "message": str(e)}), 500
+        # Guardar el nombre
+        with open(ruta_lista, 'a', encoding='utf-8') as f:
+            f.write(f"<p>SOLDADO: {nombre}</p>\n")
             
-    return jsonify({"status": "error", "message": "Datos inválidos"}), 400
+        return jsonify({"status": "success", "message": "REGISTRO EXITOSO"})
+    except Exception as e:
+        print(f"Error en servidor: {e}")
+        return jsonify({"status": "error", "message": "Error interno del servidor"}), 500
 
-# --- LÓGICA MULTIJUGADOR (Socket.IO) ---
+# --- LÓGICA MULTIJUGADOR ---
 
 @socketio.on('join')
 def on_join(data):
-    # Usamos type: ignore para que Pylance no se queje del sid
     sid = request.sid # type: ignore
-    emit('new_player', {'id': sid, 'name': data['name']}, broadcast=True, include_self=False)
+    # Avisar a todos que entró alguien nuevo
+    emit('new_player', {'id': sid, 'name': data.get('name', 'Anon')}, broadcast=True, include_self=False)
 
 @socketio.on('move')
 def on_move(data):
-    emit('player_moved', {'id': request.sid, 'x': data['x'], 'y': data['y'], 'z': data['z'], 'ry': data['ry']}, broadcast=True, include_self=False) # type: ignore
+    # Reenviar la posición a los demás jugadores
+    emit('player_moved', {
+        'id': request.sid, # type: ignore
+        'x': data['x'], 
+        'y': data['y'], 
+        'z': data['z'], 
+        'ry': data['ry']
+    }, broadcast=True, include_self=False)
+
 @socketio.on('disconnect')
 def on_disconnect():
-    emit('player_left', {'id': request.sid}, broadcast=True)
+    emit('player_left', {'id': request.sid}, broadcast=True) # type: ignore
 
 if __name__ == '__main__':
-    # Importante para Render: el puerto lo define la variable de entorno PORT
     port = int(os.environ.get("PORT", 5000))
-    socketio.run(app, host='0.0.0.0', port=port, debug=True)
+    socketio.run(app, host='0.0.0.0', port=port, debug=False)
